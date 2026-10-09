@@ -1,5 +1,51 @@
 # Changelog
 
+## [6.3.0](https://github.com/morluto/rea/compare/rea-agents-6.2.0...rea-agents-6.3.0) (2026-10-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **native:** Objective-C attribute tokens now contain only name and value. Properties report nullable atomicity and readonly facts; class flags, ivar counts, and method requirement flags are nullable when unobserved.
+
+### Bug Fixes
+
+* **artifacts:** retain DMG ownership through uncertain attachment ([a27794c](https://github.com/morluto/rea/commit/a27794c246b3f11d7f92ae7f6d276718190ab731))
+* **ghidra:** retain process ownership after failed launch rollback ([07675f7](https://github.com/morluto/rea/commit/07675f78c66ce9e8706e808d417265e18ba9f3a5))
+* **managed:** bind graph facts to their source Evidence ([cc7b5af](https://github.com/morluto/rea/commit/cc7b5af0777fc68ebba10ec061244729ebf2357d))
+* **mcp:** admit composed analysis through result bookkeeping ([e11f4d3](https://github.com/morluto/rea/commit/e11f4d371abaa8cb65ebf7b94fa216329fd78d88))
+* **mcp:** retry failed shutdown resources and retain failure reasons ([e64678e](https://github.com/morluto/rea/commit/e64678e8f9768dd819d8f5f12cc844a6660ff2c5))
+* **native:** preserve unknown Objective-C metadata ([b112d44](https://github.com/morluto/rea/commit/b112d44a3961939881779c81a57e7a3f9d1372f7))
+* **native:** refuse to list architectures of non-Mach-O targets ([#1325](https://github.com/morluto/rea/issues/1325)) ([1b73b5a](https://github.com/morluto/rea/commit/1b73b5ab4bc75bd424e643de8e49f142ffa2b336))
+* retain completed observations when later analysis steps fail ([35f121f](https://github.com/morluto/rea/commit/35f121f4acac821e848c485fb82a2c42f51f6ea1))
+* **targets:** cancel resolution before provider admission ([f3c4a33](https://github.com/morluto/rea/commit/f3c4a332f7bd198bd67f0187bc2a85c7b31bb960))
+
+
+### Performance Improvements
+
+* **json:** encode streamed JSON iteratively ([#1322](https://github.com/morluto/rea/issues/1322)) ([56598be](https://github.com/morluto/rea/commit/56598beb4e82968a313deb9efdf4b98db5bd1f4f))
+
+
+### Code Refactoring
+
+* **browser:** open scenario sessions without a factory wrapper ([d1983a4](https://github.com/morluto/rea/commit/d1983a45767bfcdc020652f48109a78a3f9fa590))
+* **catalog:** import CLI metadata from its owner ([8c96baa](https://github.com/morluto/rea/commit/8c96baab80dc258d31ca1632d761fffb11dbaaae))
+* **process:** remove duplicate observation and trace entry points ([070339a](https://github.com/morluto/rea/commit/070339af50a50a0f23e82db859e761c53277ee79))
+* **providers:** use canonical artifact and managed identities ([87f0051](https://github.com/morluto/rea/commit/87f0051496aff1b05ab24d6b63f79884f4ca9b8f))
+* remove obsolete source exclusions and identity wrapper ([44c92f8](https://github.com/morluto/rea/commit/44c92f88c51841735741811a68cc89fde14efa80))
+* remove single-use forwarding helpers ([4144e45](https://github.com/morluto/rea/commit/4144e454f385c372d29e301e6bb959092c606a6e))
+
+
+### Documentation
+
+* celebrate 40,000 GitHub stars 🎉 ([3edb217](https://github.com/morluto/rea/commit/3edb2172def0e0bd9076f23148f0c41cd2f341a3))
+* celebrate 40,000 GitHub stars 🎉 ([5ecc98a](https://github.com/morluto/rea/commit/5ecc98a5eac4c10d33e9c418b9ffae61c68e3ef2))
+
+
+### Tests
+
+* exercise source test selection through Git and Vitest ([25711ad](https://github.com/morluto/rea/commit/25711ad2590af136dfb301839dddd6d30971ba76))
+* share snapshot replay and managed graph fixtures ([d83cbd2](https://github.com/morluto/rea/commit/d83cbd2abf1bbf15beef990f5353457fdbaaeb8e))
+
 ## [6.2.0](https://github.com/morluto/rea/compare/rea-agents-6.1.0...rea-agents-6.2.0) (2026-10-09)
 
 
