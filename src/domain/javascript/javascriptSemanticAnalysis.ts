@@ -52,6 +52,19 @@ interface BindPatternInput {
   readonly mutable: boolean;
   readonly kind?: JavaScriptSemanticDefinition["kind"];
   readonly projection?: readonly (string | number | null)[];
+  readonly referenceOnly?: boolean;
+  readonly copyKind?: "object-rest" | "array-rest";
+  readonly copyProjectionOffset?: number;
+  readonly copyExcludedKeys?: readonly string[];
+  readonly copyStartIndex?: number;
+  readonly fallbackSources?: readonly {
+    readonly node: t.Node;
+    readonly projection: readonly (string | number | null)[];
+  }[];
+  readonly requiredSources?: readonly {
+    readonly node: t.Node;
+    readonly projection: readonly (string | number | null)[];
+  }[];
 }
 
 interface AddBindingInput {
@@ -596,12 +609,36 @@ const bindPattern = (input: BindPatternInput): void => {
     mutable,
     kind = "variable",
     projection = [],
+    referenceOnly = false,
+    copyKind,
+    copyProjectionOffset,
+    copyExcludedKeys,
+    copyStartIndex,
+    fallbackSources,
+    requiredSources,
   } = input;
   if (t.isTSParameterProperty(pattern)) {
     bindPattern({ ...input, pattern: pattern.parameter });
     return;
   }
   if (t.isIdentifier(pattern)) {
+    if (referenceOnly) {
+      const binding = scope.bindings.get(pattern.name);
+      if (binding !== undefined && initializer !== null)
+        binding.referenceInitializers.push({
+          node: initializer,
+          projection,
+          ...(copyKind === undefined ? {} : { copyKind }),
+          ...(copyProjectionOffset === undefined
+            ? {}
+            : { copyProjectionOffset }),
+          ...(copyExcludedKeys === undefined ? {} : { copyExcludedKeys }),
+          ...(copyStartIndex === undefined ? {} : { copyStartIndex }),
+          ...(fallbackSources === undefined ? {} : { fallbackSources }),
+          ...(requiredSources === undefined ? {} : { requiredSources }),
+        });
+      return;
+    }
     addBinding({
       state,
       scope,
@@ -622,6 +659,25 @@ const bindPattern = (input: BindPatternInput): void => {
         kind === "parameter" || kind === "catch"
           ? initializer
           : (initializer ?? pattern.right),
+      requiredSources: [
+        ...(requiredSources ?? []),
+        ...(initializer === null ? [] : [{ node: initializer, projection }]),
+      ],
+    });
+    bindPattern({
+      state,
+      scope,
+      mutable,
+      kind,
+      pattern: pattern.left,
+      initializer: pattern.right,
+      projection: [],
+      referenceOnly: true,
+      fallbackSources: [
+        ...(fallbackSources ?? []),
+        ...(initializer === null ? [] : [{ node: initializer, projection }]),
+      ],
+      ...(requiredSources === undefined ? {} : { requiredSources }),
     });
     return;
   }
@@ -636,7 +692,7 @@ const bindPattern = (input: BindPatternInput): void => {
   }
   if (t.isObjectPattern(pattern))
     for (const property of pattern.properties) {
-      if (t.isRestElement(property))
+      if (t.isRestElement(property)) {
         bindPattern({
           ...input,
           pattern: property.argument,
@@ -644,7 +700,23 @@ const bindPattern = (input: BindPatternInput): void => {
           mutable: true,
           projection: [],
         });
-      else {
+        bindPattern({
+          ...input,
+          pattern: property.argument,
+          projection: [...projection, null],
+          referenceOnly: true,
+          copyKind: "object-rest",
+          copyProjectionOffset: projection.length,
+          copyExcludedKeys: pattern.properties.flatMap((property) => {
+            if (t.isRestElement(property)) return [];
+            const key = semanticStaticPropertyKey(
+              property.key,
+              property.computed,
+            );
+            return key === null ? [] : [key];
+          }),
+        });
+      } else {
         const name = semanticStaticPropertyKey(property.key, property.computed);
         bindPattern({
           ...input,
@@ -655,12 +727,23 @@ const bindPattern = (input: BindPatternInput): void => {
     }
   else if (t.isArrayPattern(pattern))
     pattern.elements.forEach((element, index) => {
-      if (element !== null)
+      if (element !== null) {
         bindPattern({
           ...input,
           pattern: element,
           projection: [...projection, index],
         });
+        if (t.isRestElement(element))
+          bindPattern({
+            ...input,
+            pattern: element.argument,
+            projection: [...projection, null],
+            referenceOnly: true,
+            copyKind: "array-rest",
+            copyProjectionOffset: projection.length,
+            copyStartIndex: index,
+          });
+      }
     });
 };
 
@@ -702,8 +785,10 @@ const createBinding = (
   kind,
   mutable,
   mutatedPaths: [],
+  escapedPaths: [],
   definitions: [],
   initializers: [],
+  referenceInitializers: [],
   directOrigins: [],
 });
 

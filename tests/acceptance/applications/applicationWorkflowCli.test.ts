@@ -457,7 +457,117 @@ describe("application workflow CLI input", () => {
   });
 });
 
+describe("application workflow CLI copy boundaries", () => {
+  it("compares source values excluded from escaped rest and spread copies", async () => {
+    const root = await createTestTempDirectory("rea-copy-boundary-cli-");
+    temporary.push(root);
+    const sources = [
+      `export default function make() {
+        function mutate(value) { value.changed = true; }
+        const objectRest = { only: { value: "TOKEN" } };
+        const { only, ...restObject } = objectRest;
+        mutate(restObject);
+        const arrayRest = [{ value: "TOKEN" }];
+        const [head, ...restArray] = arrayRest;
+        mutate(restArray);
+        const objectSpread = { child: { value: "TOKEN" } };
+        const spreadObject = { ...objectSpread, child: {} };
+        mutate(spreadObject.child);
+        const arraySpread = [{ value: "TOKEN" }];
+        const spreadArray = [{}, ...arraySpread];
+        mutate(spreadArray[0]);
+        return {
+          kind: "copy-boundary",
+          objectRest: objectRest.only.value,
+          arrayRest: arrayRest[0].value,
+          objectSpread: objectSpread.child.value,
+          arraySpread: arraySpread[0].value,
+        };
+      }`,
+      `export default function make() {
+        return {
+          kind: "copy-boundary",
+          objectRest: "UPDATED", arrayRest: "UPDATED",
+          objectSpread: "UPDATED", arraySpread: "UPDATED",
+        };
+      }`,
+    ];
+    const [left, right] = await analyzeCliSources(root, sources);
+    const inputPath = join(root, "comparison.json");
+    await writeFile(
+      inputPath,
+      JSON.stringify({
+        left,
+        right,
+        left_module_path: "parser.mjs",
+        left_export_name: "default",
+        right_module_path: "parser.mjs",
+        right_export_name: "default",
+      }),
+    );
+    const compared = await runCli([
+      "compare-javascript-export-shapes",
+      inputPath,
+      "--json",
+    ]);
+    expect(compared).toMatchObject({
+      normalized_result: {
+        summary: { added: 0, removed: 0, changed: 4, unknown: 0 },
+        coverage: { status: "complete-within-inputs" },
+        changes: expect.arrayContaining(
+          ["/arrayRest", "/arraySpread", "/objectRest", "/objectSpread"].map(
+            (path) =>
+              expect.objectContaining({
+                status: "changed",
+                path,
+                left: { availability: "literal", value: "TOKEN" },
+                right: { availability: "literal", value: "UPDATED" },
+              }),
+          ),
+        ),
+      },
+    });
+  }, 20_000);
+});
+
 describe("application workflow CLI export Evidence", () => {
+  it("preserves uncertainty after a helper can mutate an awaited return object", async () => {
+    const root = await createTestTempDirectory("rea-awaited-export-shape-cli-");
+    temporary.push(root);
+    const sources = [
+      `export default async function make() {
+        const result = { kind: "record" };
+        function mutate(value) { value.extra = 1; }
+        mutate(await result);
+        return result;
+      }`,
+      'export default async function make() { return { kind: "record", extra: 1 }; }',
+    ];
+    const [left, right] = await analyzeCliSources(root, sources);
+    const compared = await runCli([
+      "compare-javascript-export-shapes",
+      JSON.stringify({
+        left,
+        right,
+        left_module_path: "parser.mjs",
+        left_export_name: "default",
+        right_module_path: "parser.mjs",
+        right_export_name: "default",
+      }),
+      "--json",
+    ]);
+    expect(compared).toMatchObject({
+      operation: "compare_javascript_export_shapes",
+      normalized_result: {
+        summary: { added: 0, removed: 0, changed: 0 },
+        coverage: { status: "partial" },
+        changes: expect.arrayContaining([
+          expect.objectContaining({ status: "unknown" }),
+        ]),
+      },
+    });
+  }, 20_000);
+
   it("compares exact export shapes from file-backed Evidence", async () => {
     const root = await createTestTempDirectory("rea-export-shape-cli-");
     temporary.push(root);
@@ -646,6 +756,23 @@ describe("application workflow CLI validation", () => {
     });
   }, 20_000);
 });
+
+const analyzeCliSources = (
+  root: string,
+  sources: readonly string[],
+): Promise<unknown[]> =>
+  Promise.all(
+    sources.map(async (source, index) => {
+      const applicationRoot = join(root, String(index));
+      await mkdir(applicationRoot);
+      await writeFile(join(applicationRoot, "parser.mjs"), source);
+      return runCli([
+        "analyze-javascript-application",
+        applicationRoot,
+        "--json",
+      ]);
+    }),
+  );
 
 const runCli = async (
   arguments_: readonly string[],
